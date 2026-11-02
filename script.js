@@ -179,17 +179,19 @@ const clipboardCopy = content => content && navigator.clipboard.writeText(conten
 function renderMarkdown(text) {
   // Escape HTML to prevent injection
   const escaped = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
+    ?.replace(/&/g, "&amp;")
+     .replace(/</g, "&lt;")
+     .replace(/>/g, "&gt;")
 
     // Prevent certain LLM responses from being parsed as italic
     .replace(/(?<!_)_(?=[A-Za-z0-9]|\b)/g, "\\_")
 
-  return snarkdown(escaped)
+  if (escaped) return snarkdown(escaped)
 }
 
 function appendMessage(text, type) {
+  if (!text) return
+
   const className = `message ${type}`
   const element = type?.includes("connect") || type === "error"
     ? createElement("h5", { className })
