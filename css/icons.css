@@ -29,9 +29,9 @@
   --icon-link-external: var(--icon-square-arrow-out-up-right);
 }
 
-svg[class|=icon] {
-  --icon-size: 1em;
-  aspect-ratio: 1 / 1;
+svg.icon {
+  display: inline-block;
+  margin-bottom: -0.33lh;
 
   fill: none;
   stroke: currentcolor;

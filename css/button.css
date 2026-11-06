@@ -2,11 +2,13 @@ button, [role=button] {
   width: fit-content;
   text-wrap: nowrap;
 
-  &:not([class*=chip], footer &, :has(svg[class|=icon]:only-child)) { padding-top: 2.5ex }
+  &:not([class*=chip], footer &, :has(svg.icon:only-child)) { padding-top: 2.5ex }
 
-  color: white;
-  background-color: var(--color-primary);
-  border: var(--border);
+  &:not(label:has(input[type=file])) {
+    color: white;
+    background-color: var(--color-primary);
+    border: var(--border);
+  }
   border-color: transparent;
   border-radius: var(--corner-round);
 
@@ -19,15 +21,10 @@ button, [role=button] {
     margin-inline-end: 1ch;
   }
 
-  &:has(svg[class|=icon]:only-child) {
+  &:has(svg.icon:only-child) {
     menu[role=toolbar] & {
       padding: 0;
       border: none;
-    }
-
-    svg[class|=icon] {
-      height: fit-content;
-      max-width: var(--icon-size);
     }
 
     figcaption & path[pathLength] {

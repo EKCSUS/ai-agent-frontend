@@ -684,3 +684,122 @@ function sendMessage() {
 
 submit.onclick = sendMessage
 input.addEventListener("keydown", ({ key }) => key === "Enter" && sendMessage())
+
+
+const label = document.querySelector('footer label[for="file-upload"]')
+const uploader = label.querySelector("footer input#file-upload")
+
+const keys = {
+  enter: 13,
+  space: 32,
+}
+label.addEventListener("keyup", event => Object.values(keys).includes(event.keyCode) && event.target.click())
+
+const environment = {
+  production: { region: "eu-west-1", id: "xx5shijsar3u53p6y45wsmqcnq0quzlu" },
+  staging:    { region: "eu-west-3", id: "gx7wg6ioaswclnlga2kirws7u40hiiso" },
+  dev:        { region: "us-east-1", id: "d6ya7mwq3wvkt7r76rbd773tya0oopdb" },
+}
+const { region, id } = environment.dev
+const endpoint = `https://${id}.lambda-url.${region}.on.aws/mediaferry/uploadFiles`
+
+const limit = 10 // MB
+const allowed = {
+  "image/png":       [".png"],
+  "image/jpeg":      [".jpg", ".jpeg"],
+  "application/pdf": [".pdf"],
+}
+
+const accept = Object.entries(allowed)
+  .reduce((accept, [mime, ext]) => [...accept, mime, ...ext], [])
+
+uploader.accept = accept.join(", ")
+
+
+uploader.addEventListener("change", upload)
+
+
+export class FileUploadError extends Error {}
+
+export const bytes = mb => mb * (1024 ** 2)
+
+export const signature = file => file
+  .slice(0, 4)
+  .bytes()
+  .then(bytes => bytes
+    .reduce((bytes, byte) => bytes += byte.toString(16), ""))
+
+async function mimeType(file) {
+  const hex = await signature(file)
+  switch (hex) {
+    // https://filesignature.org
+    case "89504e47": return "image/png"
+    case "ffd8ffdb":
+    case "ffd8ffe0":
+    case "ffd8ffe1":
+    case "ffd8ffe2":
+    case "ffd8ffe3":
+    case "ffd8ffe8": return "image/jpeg"
+    case "25504446": return "application/pdf"
+  }
+}
+
+async function upload({ target }) {
+  try {
+    // Prepare the request payload
+    const valid = await Array.fromAsync(target.files, validate)
+      .then(files => files.filter(Boolean))
+
+    if (valid.length === 0) return
+
+    const files = valid.map(({ name, type }) => ({ fileName: name, mimeType: type }))
+
+    // Request presigned URLs from the backend
+    const { presignedUrls } = await post(endpoint, { files }) ?? {}
+
+    if (!presignedUrls) return
+
+    // Upload each file using the presigned URL
+    await Array.fromAsync(presignedUrls, ({ signedUrl, fileName }) => {
+      const file = valid.find(file => fileName === file.name)
+      const headers = { "Content-Type": file.type }
+      return put(signedUrl, file, { headers })
+    })
+
+    const [{ hostedUrl }] = presignedUrls
+    sendMessageText(hostedUrl)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+async function validate(file) {
+  const ext = file.name.split(".").pop()
+  const format = ext.toUpperCase()
+
+  if (!accept.includes(file.type) && !accept.includes(`.${ext}`))
+    uploader.setCustomValidity(`${format} files are not yet supported.`)
+
+  else if (file.size > bytes(limit))
+    uploader.setCustomValidity(`File size is too large (max ${limit} MB).`)
+  else {
+    const type = await mimeType(file)
+    uploader.setCustomValidity(type && file.type === type ? "" : `Invalid ${format}: '${file.name}'.`)
+  }
+  return uploader.reportValidity() && file
+}
+
+const post = (endpoint, data) => _fetch(endpoint, data, { method: "POST" })
+const put  = (endpoint, data) => _fetch(endpoint, data, { method: "PUT"  })
+
+function _fetch(endpoint, data, { headers = {}, method = "GET" }) {
+  headers["Content-Type"] ??= headers.contentType ?? "application/json"
+  try {
+    return fetch(endpoint, {
+      method,
+      body: JSON.stringify(data),
+    }).then(parse => parse.json())
+  } catch (error) {
+    console.log(error)
+  }
+}
