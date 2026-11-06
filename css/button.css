@@ -60,7 +60,10 @@ footer button[type=submit] {
 *:disabled, [aria-disabled=true] {
   pointer-events: none;
   cursor: text;
-  &:not([aria-selected=true]) { opacity: 50% }
+  &:not([aria-selected=true]) {
+    opacity: 50%;
+    img { filter: grayscale(100%) }
+  }
 }
 
 .system-choose-button::before { content: var(--icon-random) }

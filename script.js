@@ -719,11 +719,11 @@ uploader.accept = accept.join(", ")
 uploader.addEventListener("change", upload)
 
 
-export class FileUploadError extends Error {}
+class FileUploadError extends Error {}
 
-export const bytes = mb => mb * (1024 ** 2)
+const bytes = mb => mb * (1024 ** 2)
 
-export const signature = file => file
+const signature = file => file
   .slice(0, 4)
   .bytes()
   .then(bytes => bytes
@@ -756,18 +756,23 @@ async function upload({ target }) {
 
     // Request presigned URLs from the backend
     const { presignedUrls } = await post(endpoint, { files }) ?? {}
-
     if (!presignedUrls) return
 
     // Upload each file using the presigned URL
-    await Array.fromAsync(presignedUrls, ({ signedUrl, fileName }) => {
+    const uploads = await Array.fromAsync(presignedUrls, async ({ signedUrl, fileName }) => { //Promise.all[Settled](
       const file = valid.find(file => fileName === file.name)
       const headers = { "Content-Type": file.type }
-      return put(signedUrl, file, { headers })
+      const response = await put(signedUrl, file, { headers })
+      console.log("PUT response:", response)
+      //if (!ok) throw new FileUploadError(`File upload: '${file.name}' failed`)
+      return response
     })
+    console.log("Successful uploads:", uploads)
 
     const [{ hostedUrl }] = presignedUrls
+    console.debug(hostedUrl)
     sendMessageText(hostedUrl)
+    //return hostedUrl
   } catch (error) {
     console.error(error)
   }
@@ -789,16 +794,28 @@ async function validate(file) {
   return uploader.reportValidity() && file
 }
 
-const post = (endpoint, data) => _fetch(endpoint, data, { method: "POST" })
-const put  = (endpoint, data) => _fetch(endpoint, data, { method: "PUT"  })
+const post = (endpoint, body) => _fetch(endpoint, body, { method: "POST" })
+const _put  = (endpoint, body) => _fetch(endpoint, body, { method: "PUT"  })
 
-function _fetch(endpoint, data, { headers = {}, method = "GET" }) {
+
+function put(endpoint, body, { headers }) {
+  //const headers = { "Content-Type": `multipart/form-data; boundary=${data._boundary}` } TODO?
+  try {
+    return fetch(endpoint, { method: "PUT", headers, body })
+  }  catch (error) {
+    console.log(error)
+  }
+}
+
+async function _fetch(endpoint, payload, { headers = {}, method = "GET" }) {
   headers["Content-Type"] ??= headers.contentType ?? "application/json"
   try {
-    return fetch(endpoint, {
-      method,
-      body: JSON.stringify(data),
-    }).then(parse => parse.json())
+    const body = headers["Content-Type"] === "application/json" ? JSON.stringify(payload) : payload
+    const response = await fetch(endpoint, { method, body })
+      //.then(response => response.json())
+      //.then(data => data)
+    const data = await response.json()
+    return data
   } catch (error) {
     console.log(error)
   }
